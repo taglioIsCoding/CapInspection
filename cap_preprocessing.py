@@ -1,16 +1,19 @@
 import cv2
 import numpy as np
+from pathlib import Path
 from matplotlib import pyplot as plt
-import sys
 
-def cap_preprocessing(path):
+def cap_preprocessing(path, flag_otsu=False):
     try: 
         filename = path.split("/")[-1]
         image = cv2.imread(path, cv2.COLOR_BGR2GRAY)
-        image = image[:,:, 0]
         
         ## Binarization by thresholding the pixel intensity
-        _, image_bin = cv2.threshold(image.astype(np.uint8), 20, 255, cv2.THRESH_BINARY)
+        if not flag_otsu:
+            _, image_bin = cv2.threshold(image.astype(np.uint8), 20, 255, cv2.THRESH_BINARY)
+        else:
+            # using Otsu's thresholding for unstable lighting conditions
+            _, image_bin = cv2.threshold(image.astype(np.uint8), 20, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         
         ## Step: 1.1
         center, radius = cap_outline(file=filename, image_bin=image_bin)
@@ -43,9 +46,19 @@ def cap_preprocessing(path):
         
         # Saving final rectified crop
         rectified_crop = cv2.rotate(polar_image[int(min(warped_corners[1])):int(max(warped_corners[1])),int(min(warped_corners[0])):int(max(warped_corners[0]))], cv2.ROTATE_90_COUNTERCLOCKWISE)
-        name = "result_" + filename + ".jpg"
+        dir = "crop_imgs/"
+        Path(dir).mkdir(parents=True, exist_ok=True)
+        name = "result_" + filename
+        res_path = dir + name
         
-        return cv2.imwrite(name, rectified_crop)
+        # Plotting for visualization
+        fig, (ax1, ax2) = plt.subplots(1,2)
+        fig.set_size_inches(40, 40)
+        ax1.set_title(filename, fontsize=20)
+        ax1.imshow(image, cmap='gray', vmin=0, vmax=255)
+        ax2.set_title(name, fontsize=20)
+        ax2.imshow(rectified_crop, cmap='gray', vmin=0, vmax=255)
+        return cv2.imwrite(res_path, rectified_crop)
     
     except Exception as e:
         print(f"An error occurred:\n\t{e}")
@@ -86,7 +99,7 @@ def cap_outline(file, image_bin):
 
     if circles is not None:
         if len(circles[0]) > 1:
-            print(f"Image {file} has 2 or more circles")
+            raise ValueError(f"Image {file}: has 2 or more circles")
             
         for circle in circles[0]:
             center = [circle[0], circle[1]]
@@ -130,9 +143,8 @@ def get_tab_center(file, roi):
         AREA = 4
         best_index = -1
         best_rect = 0
-        # The residual object are the tab and some arc region that is too big to be removed with the opening
-        # We can find the tab looking at the most rectangular object 
-        for j, stat in enumerate(stats[1:]): # Altrenativa a median: [x for x in stats[1:] if x[AREA] > 20]
+
+        for j, stat in enumerate(stats[1:]):
             rect = stat[AREA] / (stat[WIDTH] * stat[HEIGHT])
             if rect > best_rect:
                 best_rect = rect
@@ -170,7 +182,7 @@ def rotate_image(center, tab_center, image):
         rotation += 180
         
     image_center = tuple(np.array(image.shape[1::-1]) / 2)
-    rot_mat = cv2.getRotationMatrix2D(image_center, rotation, 1.0)
+    rot_mat = cv2.getRotationMatrix2D(np.asarray(center, dtype=np.float32), rotation, 1.0)
     
     image_with_vertical_tab = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
     
