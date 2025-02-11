@@ -3,27 +3,31 @@ import numpy as np
 from pathlib import Path
 from matplotlib import pyplot as plt
 
-BINARY_TRESHOLD = 40
+BINARY_TRESHOLD = 20
 WARP_COEF = 3.5
 ANNULAR_REGION_SIZE = 15
+# used for better readability while using connected components' stats
+WIDTH = 2
+HEIGHT = 3
+AREA = 4
 
 def cap_preprocessing(path, flag_otsu=False):
     try: 
         filename = path.split("/")[-1]
         image = cv2.imread(path, cv2.COLOR_BGR2GRAY)
         
-        ## Binarization by thresholding the pixel intensity
+        ## binarization by thresholding the pixel intensity
         if not flag_otsu:
-            _, image_bin = cv2.threshold(image.astype(np.uint8), BINARY_TRESHOLD, 255, cv2.THRESH_BINARY)
+            _, image_bin = cv2.threshold(image, BINARY_TRESHOLD, 255, cv2.THRESH_BINARY)
         else:
             # using Otsu's thresholding for unstable lighting conditions
-            _, image_bin = cv2.threshold(image.astype(np.uint8), 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+            _, image_bin = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         
         ## Step: 1.1
         center, radius = cap_outline(file=filename, image_bin=image_bin)
         
         radius_inside = int(np.ceil(radius))
-        center = (int(np.ceil(center[0])), int(np.ceil(center[1])))
+        center = (int(center[0]), int(center[1]))
         
         ## Step: 1.2.1
         radius_outside = find_annular_region(radius_inside)
@@ -43,7 +47,7 @@ def cap_preprocessing(path, flag_otsu=False):
         cart_corner_coords = extract_corner_coords(radius=radius, center=center)
         
         ## Step: 2
-        flags = cv2.INTER_CUBIC | cv2.WARP_FILL_OUTLIERS | cv2.WARP_POLAR_LINEAR
+        flags = cv2.WARP_FILL_OUTLIERS | cv2.WARP_POLAR_LINEAR
         warp_radius = WARP_COEF*radius
         polar_image = cv2.warpPolar(image_with_vertical_tab, image_with_vertical_tab.shape, np.asarray(center, dtype=np.float32), warp_radius, flags)
         warped_corners = find_warped_corners(corners_coords=cart_corner_coords, center=center, warp_radius=warp_radius, polar_image=polar_image)
@@ -76,7 +80,7 @@ def cap_preprocessing(path, flag_otsu=False):
 def cap_outline(file, image_bin):    
 
     # 2. applying erosion on the binarized image, and then subtracting the result to the original binarized image
-    edge_detected_image = image_bin - cv2.morphologyEx(image_bin, cv2.MORPH_ERODE, np.ones((3,3), np.uint8), iterations=1)
+    edge_detected_image = image_bin - cv2.erode(image_bin, np.ones((3,3), np.uint8))
 
     # 3. finding the cap radius by search in the middle vertical line
     middle_line = edge_detected_image[:, int(edge_detected_image.shape[1]/2)]
@@ -129,8 +133,7 @@ def mask_cap(image_bin, center, radius_inside, radius_outside):
     cv2.circle(mask, center, radius_outside, (255), thickness=-1)
     cv2.circle(mask, center, radius_inside, (0), thickness=-1)
     circular_roi = cv2.bitwise_and(image_bin, image_bin, mask=mask)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    circular_roi_open = cv2.morphologyEx(circular_roi, cv2.MORPH_OPEN, kernel, iterations=2)
+    circular_roi_open = cv2.morphologyEx(circular_roi, cv2.MORPH_OPEN, np.ones((5,5), np.uint8), iterations=2)
     return circular_roi_open
 
 
@@ -142,9 +145,6 @@ def get_tab_center(file, roi):
 
     if len(centroids) > 2:
         print(f"{file}: Found {len(centroids) - 1} object in the anular region, they are too many")
-        WIDTH = 2
-        HEIGHT = 3
-        AREA = 4
         best_index = -1
         best_rect = 0
 
@@ -166,13 +166,13 @@ def get_tab_center(file, roi):
 #########################################################
 
 def rotate_image(center, tab_center, image):
-        # m -> Slope of the straight line that connects the center of the tab with the center of the cap
+    # m -> Slope of the straight line that connects the center of the tab with the center of the cap
     m = (center[1] - tab_center[1]) / (center[0] - tab_center[0]) * 1.0
 
     # Find the angle between the green and the blue lines
-    x = np.abs(tab_center[0]-center[0])
-    y = np.abs(tab_center[1]-center[1])
-    teta = np.arctan(x/y)
+    dx = np.abs(tab_center[0]-center[0])
+    dy = np.abs(tab_center[1]-center[1])
+    teta = np.arctan(dx/dy)
 
     # Form rad to deg
     rotation = (teta * 180 / np.pi)
@@ -185,10 +185,9 @@ def rotate_image(center, tab_center, image):
     if tab_center[1] > center[1]:
         rotation += 180
         
-    image_center = tuple(np.array(image.shape[1::-1]) / 2)
     rot_mat = cv2.getRotationMatrix2D(np.asarray(center, dtype=np.float32), rotation, 1.0)
     
-    image_with_vertical_tab = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+    image_with_vertical_tab = cv2.warpAffine(image, rot_mat, image.shape[1::-1])
     
     return image_with_vertical_tab
 
