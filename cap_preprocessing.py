@@ -3,6 +3,10 @@ import numpy as np
 from pathlib import Path
 from matplotlib import pyplot as plt
 
+BINARY_TRESHOLD = 40
+WARP_COEF = 3.5
+ANNULAR_REGION_SIZE = 15
+
 def cap_preprocessing(path, flag_otsu=False):
     try: 
         filename = path.split("/")[-1]
@@ -10,7 +14,7 @@ def cap_preprocessing(path, flag_otsu=False):
         
         ## Binarization by thresholding the pixel intensity
         if not flag_otsu:
-            _, image_bin = cv2.threshold(image.astype(np.uint8), 40, 255, cv2.THRESH_BINARY)
+            _, image_bin = cv2.threshold(image.astype(np.uint8), BINARY_TRESHOLD, 255, cv2.THRESH_BINARY)
         else:
             # using Otsu's thresholding for unstable lighting conditions
             _, image_bin = cv2.threshold(image.astype(np.uint8), 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
@@ -40,7 +44,7 @@ def cap_preprocessing(path, flag_otsu=False):
         
         ## Step: 2
         flags = cv2.INTER_CUBIC | cv2.WARP_FILL_OUTLIERS | cv2.WARP_POLAR_LINEAR
-        warp_radius = 3.5*radius
+        warp_radius = WARP_COEF*radius
         polar_image = cv2.warpPolar(image_with_vertical_tab, image_with_vertical_tab.shape, np.asarray(center, dtype=np.float32), warp_radius, flags)
         warped_corners = find_warped_corners(corners_coords=cart_corner_coords, center=center, warp_radius=warp_radius, polar_image=polar_image)
         
@@ -113,7 +117,7 @@ def cap_outline(file, image_bin):
 ## Step 1.2.1: Finding the annular region containing the tab ##
 ###############################################################
 def find_annular_region(radius):
-    radius_outside = radius + 15
+    radius_outside = radius + ANNULAR_REGION_SIZE
     return radius_outside
 
 
