@@ -38,7 +38,6 @@ def cap_preprocessing(path, flag_otsu=False):
         ## Step: 1.2.3
         tab_center = get_tab_center(file=filename, roi=circular_roi_opened)
         tab_center = np.int32(np.around(tab_center))
-        center = np.int32(np.around(center))
         
         ## Step: 1.2.4
         image_with_vertical_tab = rotate_image(center=center, tab_center=tab_center, image=image)
@@ -47,9 +46,9 @@ def cap_preprocessing(path, flag_otsu=False):
         cart_corner_coords = extract_corner_coords(radius=radius, center=center)
         
         ## Step: 2
-        flags = cv2.WARP_FILL_OUTLIERS | cv2.WARP_POLAR_LINEAR
-        warp_radius = WARP_COEF*radius
-        polar_image = cv2.warpPolar(image_with_vertical_tab, image_with_vertical_tab.shape, np.asarray(center, dtype=np.float32), warp_radius, flags)
+        polar_image, warp_radius = warp_image(radius=radius, image_with_vertical_tab=image_with_vertical_tab, center=center) 
+        
+        ## Step: 3
         warped_corners = find_warped_corners(corners_coords=cart_corner_coords, center=center, warp_radius=warp_radius, polar_image=polar_image)
         
         # Saving final rectified crop
@@ -208,8 +207,17 @@ def extract_corner_coords(center, radius):
     
     return [top_left, top_right, bottom_right, bottom_left]
 
+#####################################################################
+## Step 2: Applying a Polar Transform to the image with tab on top ##
+#####################################################################
+def warp_image(radius, image_with_vertical_tab, center):
+    flags = cv2.WARP_FILL_OUTLIERS | cv2.WARP_POLAR_LINEAR
+    warp_radius = WARP_COEF*radius
+    polar_image = cv2.warpPolar(image_with_vertical_tab, image_with_vertical_tab.shape, np.asarray(center, dtype=np.float32), warp_radius, flags)
+    return polar_image, warp_radius
+
 ###################################################
-## Step 2.1: Extracting Polar corner coordinates ##
+## Step 3: Extracting Polar corner coordinates ##
 ###################################################
 def find_warped_corners(corners_coords, center, warp_radius, polar_image):
     warped_corners = [[],[]]
