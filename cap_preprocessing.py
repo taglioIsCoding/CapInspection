@@ -10,10 +10,10 @@ def cap_preprocessing(path, flag_otsu=False):
         
         ## Binarization by thresholding the pixel intensity
         if not flag_otsu:
-            _, image_bin = cv2.threshold(image.astype(np.uint8), 20, 255, cv2.THRESH_BINARY)
+            _, image_bin = cv2.threshold(image.astype(np.uint8), 40, 255, cv2.THRESH_BINARY)
         else:
             # using Otsu's thresholding for unstable lighting conditions
-            _, image_bin = cv2.threshold(image.astype(np.uint8), 20, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+            _, image_bin = cv2.threshold(image.astype(np.uint8), 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         
         ## Step: 1.1
         center, radius = cap_outline(file=filename, image_bin=image_bin)
