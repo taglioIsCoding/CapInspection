@@ -3,10 +3,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 import sys
 
-def cap_preprocessing(filename):
+def cap_preprocessing(path):
     try: 
-        path = "img/" + filename
+        filename = path.split("/")[-1]
         image = cv2.imread(path, cv2.COLOR_BGR2GRAY)
+        image = image[:,:, 0]
         
         ## Binarization by thresholding the pixel intensity
         _, image_bin = cv2.threshold(image.astype(np.uint8), 20, 255, cv2.THRESH_BINARY)
