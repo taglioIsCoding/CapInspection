@@ -171,10 +171,12 @@ def rotate_image(center, tab_center, image):
     # Find the angle between the green and the blue lines
     dx = np.abs(tab_center[0]-center[0])
     dy = np.abs(tab_center[1]-center[1])
-    teta = np.arctan(dx/dy)
+
+    # equivalent to arctan covering corner cases (e.g. for dy=0 => theta = pi/2)
+    theta = np.arctan2(dx,dy)
 
     # Form rad to deg
-    rotation = (teta * 180 / np.pi)
+    rotation = (theta * 180 / np.pi)
     
     # Looking at the slope we choose the direction of the rotation
     if m > 0 :
@@ -207,9 +209,9 @@ def extract_corner_coords(center, radius):
     
     return [top_left, top_right, bottom_right, bottom_left]
 
-#####################################################################
-## Step 2: Applying a Polar Transform to the image with tab on top ##
-#####################################################################
+#######################################################################
+## Step 2.1: Applying a Polar Transform to the image with tab on top ##
+#######################################################################
 def warp_image(radius, image_with_vertical_tab, center):
     flags = cv2.WARP_FILL_OUTLIERS | cv2.WARP_POLAR_LINEAR
     warp_radius = WARP_COEF*radius
@@ -217,7 +219,7 @@ def warp_image(radius, image_with_vertical_tab, center):
     return polar_image, warp_radius
 
 ###################################################
-## Step 3: Extracting Polar corner coordinates ##
+## Step 2.2: Extracting Polar corner coordinates ##
 ###################################################
 def find_warped_corners(corners_coords, center, warp_radius, polar_image):
     warped_corners = [[],[]]
